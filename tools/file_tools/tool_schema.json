@@ -1,0 +1,60 @@
+[
+  {
+    "name": "read_file",
+    "description": "Reads the contents of a file within the agent's sandbox directory. Returns the file text on success, or an error message if the file doesn't exist or the path attempts to escape the sandbox. Use this to inspect existing code before editing it.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative path to the file inside the sandbox directory (e.g. 'solution.py' or 'src/main.py'). Must not contain '..' to escape the sandbox."
+        }
+      },
+      "required": ["path"]
+    },
+    "returns": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": ["string", "null"],
+          "description": "The full text content of the file. Null if the read failed."
+        },
+        "error": {
+          "type": ["string", "null"],
+          "description": "Error message if the read failed. Null on success."
+        }
+      }
+    }
+  },
+  {
+    "name": "write_file",
+    "description": "Writes text content to a file within the agent's sandbox directory, creating parent directories as needed. Overwrites the file if it already exists. Use this to save code fixes before re-running with run_code.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative path to the file inside the sandbox directory (e.g. 'solution.py'). Must not contain '..' to escape the sandbox."
+        },
+        "content": {
+          "type": "string",
+          "description": "The full text content to write to the file."
+        }
+      },
+      "required": ["path", "content"]
+    },
+    "returns": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "True if the file was written successfully."
+        },
+        "error": {
+          "type": ["string", "null"],
+          "description": "Error message if the write failed. Null on success."
+        }
+      }
+    }
+  }
+]
