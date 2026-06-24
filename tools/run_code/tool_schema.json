@@ -1,0 +1,44 @@
+{
+  "name": "run_code",
+  "description": "Executes a Python code snippet in an isolated subprocess and returns the result. Use this tool to verify that generated code actually runs correctly before presenting it to the user. Handles syntax errors, runtime exceptions, and infinite loops safely.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "code": {
+        "type": "string",
+        "description": "Valid Python source code to execute. Should be a self-contained snippet (imports included). Output must be produced via print() statements."
+      },
+      "timeout": {
+        "type": "number",
+        "description": "Maximum execution time in seconds before the process is killed. Defaults to 5.0 if not provided."
+      }
+    },
+    "required": [
+      "code"
+    ]
+  },
+  "returns": {
+    "type": "object",
+    "properties": {
+      "stdout": {
+        "type": "string",
+        "description": "Everything the code printed to standard output."
+      },
+      "stderr": {
+        "type": "string",
+        "description": "Error messages or tracebacks from the code. Non-empty means something went wrong."
+      },
+      "exit_code": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "The OS exit code of the subprocess. 0 = success, non-zero = error, null = timed out."
+      },
+      "timed_out": {
+        "type": "boolean",
+        "description": "True if the code was killed because it exceeded the timeout."
+      }
+    }
+  }
+}
