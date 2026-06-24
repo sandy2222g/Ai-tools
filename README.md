@@ -11,8 +11,7 @@ Each tool lives in its own folder under `tools/`, is self-contained, and ships w
 | Tool | Description | Dependencies |
 |------|-------------|--------------|
 | [run_code](./tools/run_code/) | Execute Python snippets in an isolated subprocess. Returns `stdout`, `stderr`, `exit_code`, `timed_out`. | None (stdlib only) |
-
-> More tools coming soon.
+| [file_tools](./tools/file_tools/) | Sandboxed `read_file` and `write_file` with path-traversal protection. | None (stdlib only) |
 
 ---
 
@@ -24,7 +23,12 @@ ai-agent-tools/
 ├── .gitignore
 │
 ├── tools/                     ← One folder per tool
-│   └── run_code/
+│   ├── run_code/
+│   │   ├── __init__.py
+│   │   ├── tool.py
+│   │   ├── tool_schema.json
+│   │   └── README.md
+│   └── file_tools/
 │       ├── __init__.py
 │       ├── tool.py
 │       ├── tool_schema.json

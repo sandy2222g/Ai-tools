@@ -1,0 +1,19 @@
+# file_tools package
+# Exposes sandboxed read_file, write_file, and their LLM schema loader.
+import json
+from pathlib import Path
+from .tool import read_file, write_file
+
+__all__ = ["read_file", "write_file", "load_schema"]
+
+
+def load_schema() -> list:
+    """
+    Load and return the tool definition schemas from tool_schema.json.
+
+    Returns:
+        list: A list of two tool schema dicts (read_file and write_file).
+    """
+    schema_path = Path(__file__).parent / "tool_schema.json"
+    with open(schema_path, "r", encoding="utf-8") as f:
+        return json.load(f)
