@@ -56,5 +56,33 @@
         }
       }
     }
+  },
+  {
+    "name": "list_files",
+    "description": "Lists the immediate contents of a directory within the agent's sandbox. Returns file and directory names (directories have a trailing '/'). Skips hidden files. Use this to explore what files exist before deciding what to read or edit.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative path to a directory inside the sandbox (e.g. '.' for the root, or 'src/'). Defaults to '.'. Must not contain '..' to escape the sandbox."
+        }
+      },
+      "required": []
+    },
+    "returns": {
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": ["array", "null"],
+          "items": { "type": "string" },
+          "description": "Sorted list of entry names. Directories end with '/'. Null if the listing failed."
+        },
+        "error": {
+          "type": ["string", "null"],
+          "description": "Error message if the listing failed. Null on success."
+        }
+      }
+    }
   }
 ]

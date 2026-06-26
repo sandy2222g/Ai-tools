@@ -60,3 +60,33 @@ def write_file(path: str, content: str, sandbox_dir: str = None) -> dict:
         return {"success": True, "error": None}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+def list_files(path: str = ".", sandbox_dir: str = None) -> dict:
+    """
+    Lists immediate contents of a directory within the sandbox.
+    Skips hidden files/directories (names starting with '.').
+    Appends '/' to directory names to distinguish them from files.
+
+    Parameters:
+    - path (str): Relative path to a directory inside the sandbox. Defaults to ".".
+    - sandbox_dir (str): Optional override for the sandbox root directory.
+
+    Returns:
+    - dict:
+        - files (list[str] | None): Sorted list of entry names on success, None on failure.
+        - error (str | None): Error message on failure, None on success.
+    """
+    sandbox = Path(sandbox_dir).resolve() if sandbox_dir else SANDBOX_DIR
+    try:
+        resolved = _safe_path(path, sandbox)
+        if not resolved.is_dir():
+            return {"files": None, "error": f"Not a directory: '{path}'"}
+        entries = sorted(
+            f"{entry.name}/" if entry.is_dir() else entry.name
+            for entry in resolved.iterdir()
+            if not entry.name.startswith(".")
+        )
+        return {"files": entries, "error": None}
+    except Exception as e:
+        return {"files": None, "error": str(e)}
