@@ -11,7 +11,7 @@ Each tool lives in its own folder under `tools/`, is self-contained, and ships w
 | Tool | Description | Dependencies |
 |------|-------------|--------------|
 | [run_code](./tools/run_code/) | Execute Python snippets in an isolated subprocess. Returns `stdout`, `stderr`, `exit_code`, `timed_out`. | None (stdlib only) |
-| [file_tools](./tools/file_tools/) | Sandboxed `read_file` and `write_file` with path-traversal protection. | None (stdlib only) |
+| [file_tools](./tools/file_tools/) | Sandboxed `read_file`, `write_file`, and `list_files` with path-traversal protection. | None (stdlib only) |
 
 ---
 
