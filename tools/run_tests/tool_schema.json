@@ -1,0 +1,59 @@
+{
+  "name": "run_tests",
+  "description": "Runs pytest on a specified test file inside the sandbox directory. Captures and returns structured outcome counts, a human-readable summary, and trimmed failure/error messages.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "test_file": {
+        "type": "string",
+        "description": "Relative path to the test file inside the sandbox (e.g., 'test_solution.py')."
+      },
+      "timeout": {
+        "type": "integer",
+        "description": "Maximum execution time in seconds before the process is killed. Defaults to 10."
+      }
+    },
+    "required": [
+      "test_file"
+    ]
+  },
+  "returns": {
+    "type": "object",
+    "properties": {
+      "passed": {
+        "type": "integer",
+        "description": "Number of tests that passed."
+      },
+      "failed": {
+        "type": "integer",
+        "description": "Number of tests that failed."
+      },
+      "errors": {
+        "type": "integer",
+        "description": "Number of tests that errored (not failed)."
+      },
+      "summary": {
+        "type": "string",
+        "description": "One-line human-readable summary of the test results (e.g., '3 passed, 1 failed')."
+      },
+      "failures": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "List of failure and error messages, one per failing test, trimmed to the test name and assertion."
+      },
+      "timed_out": {
+        "type": "boolean",
+        "description": "True if the test execution timed out, False otherwise."
+      },
+      "error": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Tool-level error message if something went wrong (e.g., file not found, path traversal, pytest not installed), null on success."
+      }
+    }
+  }
+}
