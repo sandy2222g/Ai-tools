@@ -8,39 +8,53 @@
 
 ## Reporting a Vulnerability
 
-Please do **not** open a public issue for security problems.
+Do **not** open a public issue for a security problem.
 
-Report vulnerabilities privately to the maintainers. Include:
+Report it privately to the security owners listed in `.github/CODEOWNERS`. Include:
 
 - A description of the issue and its impact
 - Steps or a proof of concept to reproduce it
 - The affected version or commit
 
-We aim to acknowledge reports within 2 business days and to provide a remediation
-plan within 10 business days.
+Targets: acknowledgement within 2 business days, remediation plan within 10 business days,
+and a fix in a patch release for high-severity issues.
 
 ## Security Model
 
-These tools are designed to run **inside a sandbox directory** with no network access
-except where explicitly noted (`research_tools`).
+Tools here run **model-chosen** code, paths, and URLs. Each tool is designed on the
+assumption that its input may be adversarial.
 
-| Tool | Controls |
-|------|----------|
-| `file_tools`, `organizer_tools`, `debug_agent` | All paths are resolved and must stay within the sandbox root (component-wise check; symlinks are resolved first). |
-| `run_code` | Runs code in a **separate process** with a hard timeout. It is **not** a security boundary: untrusted code can still access the host. Run agents that execute model-generated code inside a container or VM. |
-| `run_tests` | Test files must resolve inside the sandbox. Same process-isolation caveat as `run_code`. |
-| `research_tools` | Outbound HTTP(S) to arbitrary URLs. Restrict egress at the network layer if this matters for your deployment. |
+| Tool | Control | Strength |
+|------|---------|----------|
+| `run_code`, `run_tests` | Docker container: no network, read-only FS, no capabilities, non-root, resource limits, only workdir mounted | Strong when Docker is used |
+| `run_code`, `run_tests` | `process` fallback: scrubbed env, rlimits, timeout | **Weak. Not a security boundary.** Flagged in every result via `isolation` and `warning`. |
+| `file_tools`, `organizer_tools`, `debug_agent` | Paths resolved (symlinks included) and checked component-wise against the sandbox root | Strong for path confinement |
+| `research_tools` | `safe_get`: only http/https, no embedded credentials, all resolved addresses must be public, redirects re-checked (max 3) | Blocks SSRF to loopback, private, link-local, and metadata addresses |
 
-## Hardening Checklist for Deployments
+Detailed design: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
-- Run agents in a container with a read-only root filesystem and a non-root user
-  (see `Dockerfile`).
-- Apply network egress allowlists where code execution or web access is enabled.
-- Set resource limits (CPU, memory, PIDs) on the container.
-- Keep API keys out of source control; use a secrets manager.
-- Run `make audit` (pip-audit) in CI and before each release.
+## Deployment Requirements
+
+These are the minimum for a production deployment that runs untrusted model output:
+
+1. Set `AI_TOOLS_ISOLATION=docker` so execution fails closed instead of falling back.
+2. Build and pin the sandbox image by digest (`make docker`, then reference it through `AI_TOOLS_SANDBOX_IMAGE`).
+3. Use a hardened container runtime (gVisor, Kata, or rootless Docker) for multi-tenant hosts.
+4. Apply egress allowlists at the network layer for the agent host. `safe_get` is defence in depth, not a replacement.
+5. Keep API keys out of tool inputs and out of the sandbox environment. Use a secrets manager on the agent host.
+6. Run `make audit` in CI. It is configured to fail on known vulnerabilities.
 
 ## Known Limitations
 
-- `run_code` provides timeouts, not isolation.
-- Output truncation is applied to `run_tests` but not to `run_code` stdout.
+- The `process` backend provides no filesystem or network isolation.
+- `safe_get` checks addresses before connecting. DNS rebinding can defeat that check. Network egress rules are the backstop.
+- `run_tests` and `run_code` return stdout and stderr to the model. Treat their output as untrusted data.
+- Sandboxes have no persistence between calls.
+
+## Verification
+
+- Path-confinement regressions: `tests/test_file_tools_security.py`, `tests/test_organizer_tools.py`
+- SSRF guard: `tests/test_net_guard.py`
+- Isolation configuration: `tests/test_isolation.py`
+- Live container isolation: `tests/test_docker_integration.py`, run in the `docker-isolation` CI job with `AI_TOOLS_ISOLATION=docker`
+- Dependencies: `pip-audit --strict` in CI. CodeQL (`security-extended`) runs on every push and pull request.

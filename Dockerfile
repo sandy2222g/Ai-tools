@@ -1,20 +1,27 @@
-# Hardened runtime image. The core tools are stdlib-only, so the image stays small.
-FROM python:3.12-slim AS base
+# Sandbox image: the minimal runtime in which untrusted code executes.
+#
+# It contains only the Python interpreter and pytest (for run_tests). It runs as the
+# unprivileged "nobody" user and has no network at run time: the host passes
+# --network none, so nothing needs to be configured here.
+#
+#   make docker          # build ai-agent-tools-sandbox:1.0.0
+#   AI_TOOLS_ISOLATION=docker python ...   # require this image (fail closed)
+
+FROM python:3.12-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-WORKDIR /app
+RUN pip install "pytest==9.2.0" \
+ && mkdir -p /work \
+ && chown 65534:65534 /work
 
-# Run as an unprivileged user.
-RUN useradd --create-home --uid 10001 agent
-COPY pyproject.toml README.md ./
-COPY tools ./tools
-RUN pip install --no-cache-dir .
+WORKDIR /work
+USER 65534:65534
 
-USER agent
-WORKDIR /home/agent/work
-
-ENTRYPOINT ["python", "-c"]
-CMD ["import tools.run_code as r; print(r.run_code('print(1+1)'))"]
+LABEL org.opencontainers.image.title="ai-agent-tools-sandbox" \
+      org.opencontainers.image.description="Isolated Python runtime for AI agent code execution" \
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.licenses="LicenseRef-Proprietary"

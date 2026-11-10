@@ -2,7 +2,7 @@
 
 A sandboxed pytest executor for AI agents.
 
-Runs pytest on a specified test file inside the sandbox directory. Captures and returns structured outcome counts, a human-readable summary, and trimmed failure/error messages.
+Runs pytest on a specified test file inside the sandbox directory, through the isolation layer (Docker when available; see [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)). The result includes `isolation` and `warning` fields. Captures and returns structured outcome counts, a human-readable summary, and trimmed failure/error messages.
 
 ## Files
 

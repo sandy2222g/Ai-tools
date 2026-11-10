@@ -45,6 +45,7 @@ def _safe_path(path: str) -> str:
 # TOOL IMPLEMENTATIONS
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def list_files(path: str = ".") -> dict:
     """
     Tool name: list_files
@@ -121,13 +122,19 @@ def rename_file(path: str, new_name: str) -> dict:
     """
     try:
         if os.sep in new_name or "/" in new_name:
-            return {"success": False, "error": f"new_name must not contain path separators: '{new_name}'"}
+            return {
+                "success": False,
+                "error": f"new_name must not contain path separators: '{new_name}'",
+            }
         src_full = _safe_path(path)
         if not os.path.exists(src_full):
             return {"success": False, "error": f"Path not found: '{path}'"}
         dst_full = os.path.join(os.path.dirname(src_full), new_name)
         if os.path.exists(dst_full):
-            return {"success": False, "error": f"A file named '{new_name}' already exists in that directory."}
+            return {
+                "success": False,
+                "error": f"A file named '{new_name}' already exists in that directory.",
+            }
         os.rename(src_full, dst_full)
         return {"success": True, "error": None}
     except Exception as exc:
@@ -176,13 +183,21 @@ def get_file_info(path: str) -> dict:
     try:
         resolved = _safe_path(path)
         if not os.path.exists(resolved):
-            return {"name": None, "extension": None, "size_bytes": None,
-                    "modified": None, "type": None, "error": f"Path not found: '{path}'"}
+            return {
+                "name": None,
+                "extension": None,
+                "size_bytes": None,
+                "modified": None,
+                "type": None,
+                "error": f"Path not found: '{path}'",
+            }
         stat = os.stat(resolved)
         is_dir = os.path.isdir(resolved)
         name = os.path.basename(resolved)
         ext = None if is_dir else (os.path.splitext(name)[1] or None)
-        modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+        modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%S"
+        )
         return {
             "name": name,
             "extension": ext,
@@ -192,8 +207,14 @@ def get_file_info(path: str) -> dict:
             "error": None,
         }
     except Exception as exc:
-        return {"name": None, "extension": None, "size_bytes": None,
-                "modified": None, "type": None, "error": str(exc)}
+        return {
+            "name": None,
+            "extension": None,
+            "size_bytes": None,
+            "modified": None,
+            "type": None,
+            "error": str(exc),
+        }
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -327,9 +348,9 @@ TOOLS_OPENAI = [
 # ──────────────────────────────────────────────────────────────────────────────
 
 _TOOL_MAP = {
-    "list_files":   list_files,
-    "move_file":    move_file,
-    "rename_file":  rename_file,
+    "list_files": list_files,
+    "move_file": move_file,
+    "rename_file": rename_file,
     "create_folder": create_folder,
     "get_file_info": get_file_info,
 }

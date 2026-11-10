@@ -31,27 +31,30 @@ import requests
 from bs4 import BeautifulSoup
 from duckduckgo_search import DDGS
 
+from tools._common.net import safe_get
+
 # ──────────────────────────────────────────────────────────────────────────────
 # NOTES DIRECTORY — created automatically on import
 # ──────────────────────────────────────────────────────────────────────────────
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-NOTES_DIR  = _REPO_ROOT / "research_sandbox" / "notes"
+NOTES_DIR = _REPO_ROOT / "research_sandbox" / "notes"
 NOTES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _title_to_filename(title: str) -> str:
     """Derive a safe .txt filename from an arbitrary note title."""
     slug = title.lower().strip()
-    slug = re.sub(r"[^a-z0-9\s_]", "", slug)   # strip non-alphanumeric (keep spaces + _)
-    slug = re.sub(r"\s+", "_", slug)             # spaces → underscores
-    slug = re.sub(r"_+", "_", slug).strip("_")   # collapse duplicate underscores
+    slug = re.sub(r"[^a-z0-9\s_]", "", slug)  # strip non-alphanumeric (keep spaces + _)
+    slug = re.sub(r"\s+", "_", slug)  # spaces → underscores
+    slug = re.sub(r"_+", "_", slug).strip("_")  # collapse duplicate underscores
     return f"{slug}.txt"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # TOOL IMPLEMENTATIONS
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def web_search(query: str, max_results: int = 5) -> dict:
     """
@@ -78,11 +81,13 @@ def web_search(query: str, max_results: int = 5) -> dict:
                 if not url or url in seen_urls:
                     continue
                 seen_urls.add(url)
-                results.append({
-                    "title":   r.get("title", ""),
-                    "url":     url,
-                    "snippet": r.get("body", ""),
-                })
+                results.append(
+                    {
+                        "title": r.get("title", ""),
+                        "url": url,
+                        "snippet": r.get("body", ""),
+                    }
+                )
                 if len(results) >= max_results:
                     break
         return {"results": results, "error": None}
@@ -110,17 +115,22 @@ def fetch_page(url: str, max_chars: int = 3000) -> dict:
     """
     try:
         headers = {"User-Agent": "Mozilla/5.0 (research-agent/1.0)"}
-        resp = requests.get(url, headers=headers, timeout=10)
+        # safe_get blocks private/loopback/metadata addresses and re-checks redirects.
+        resp = safe_get(url, headers=headers, timeout=10)
         resp.raise_for_status()
 
         content_type = resp.headers.get("Content-Type", "")
         if "text/html" not in content_type:
-            return {"url": url, "content": None,
-                    "error": f"Non-HTML content-type: '{content_type}'"}
+            return {
+                "url": url,
+                "content": None,
+                "error": f"Non-HTML content-type: '{content_type}'",
+            }
 
         soup = BeautifulSoup(resp.text, "html.parser")
-        for tag in soup(["script", "style", "nav", "footer", "header",
-                          "aside", "form", "noscript", "iframe"]):
+        for tag in soup(
+            ["script", "style", "nav", "footer", "header", "aside", "form", "noscript", "iframe"]
+        ):
             tag.decompose()
 
         chunks = []
@@ -159,8 +169,11 @@ def save_note(title: str, content: str) -> dict:
     try:
         filename = _title_to_filename(title)
         if not filename or filename == ".txt":
-            return {"success": False, "filename": None,
-                    "error": f"Could not derive a valid filename from title: '{title}'"}
+            return {
+                "success": False,
+                "filename": None,
+                "error": f"Could not derive a valid filename from title: '{title}'",
+            }
         path = NOTES_DIR / filename
         path.write_text(content, encoding="utf-8")
         return {"success": True, "filename": filename, "error": None}
@@ -187,11 +200,13 @@ def list_notes() -> dict:
         notes = []
         for p in sorted(NOTES_DIR.glob("*.txt")):
             title = p.stem.replace("_", " ").title()
-            notes.append({
-                "title":      title,
-                "filename":   p.name,
-                "size_bytes": p.stat().st_size,
-            })
+            notes.append(
+                {
+                    "title": title,
+                    "filename": p.name,
+                    "size_bytes": p.stat().st_size,
+                }
+            )
         return {"notes": notes, "error": None}
     except Exception as exc:
         return {"notes": None, "error": str(exc)}
@@ -216,8 +231,7 @@ def read_note(title: str) -> dict:
         filename = _title_to_filename(title)
         path = NOTES_DIR / filename
         if not path.exists():
-            return {"title": title, "content": None,
-                    "error": f"Note not found: '{filename}'"}
+            return {"title": title, "content": None, "error": f"Note not found: '{filename}'"}
         return {"title": title, "content": path.read_text(encoding="utf-8"), "error": None}
     except Exception as exc:
         return {"title": title, "content": None, "error": str(exc)}
@@ -354,11 +368,11 @@ TOOLS_OPENAI = [
 # ──────────────────────────────────────────────────────────────────────────────
 
 _TOOL_MAP = {
-    "web_search":  web_search,
-    "fetch_page":  fetch_page,
-    "save_note":   save_note,
-    "list_notes":  list_notes,
-    "read_note":   read_note,
+    "web_search": web_search,
+    "fetch_page": fetch_page,
+    "save_note": save_note,
+    "list_notes": list_notes,
+    "read_note": read_note,
 }
 
 

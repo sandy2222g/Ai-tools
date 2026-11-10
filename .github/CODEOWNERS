@@ -1,0 +1,9 @@
+# Security-sensitive code requires review from the security owners.
+/tools/_common/        @sandy2222g
+/tools/run_code/       @sandy2222g
+/tools/run_tests/      @sandy2222g
+/tools/file_tools/     @sandy2222g
+/Dockerfile            @sandy2222g
+/.github/              @sandy2222g
+
+* @sandy2222g

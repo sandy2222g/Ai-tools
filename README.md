@@ -20,22 +20,30 @@ Each tool lives in its own folder under `tools/`, is self-contained, and ships w
 
 | Area | What's in place |
 |------|-----------------|
-| Install | `pip install -e ".[dev]"` (`pyproject.toml`); `Dockerfile` runs as a non-root user |
-| Quality | `ruff` lint and a `pytest` suite (20 tests), enforced in CI on Python 3.10–3.13 |
+| Install | `pip install -e ".[dev]"` (`pyproject.toml`); hardened sandbox image in `Dockerfile` |
+| Quality | `ruff` lint and a `pytest` suite (unit tests plus live Docker isolation tests), enforced in CI on Python 3.10–3.13 |
 | Supply chain | `pip-audit` runs in CI; core tools are stdlib-only, so the dependency surface is minimal |
-| Security | Sandbox path checks use component-wise comparison with regression tests; see [SECURITY.md](./SECURITY.md) |
+| Security | Docker isolation by default for code execution (no network, read-only FS, no capabilities); SSRF guard for web fetches; component-wise path confinement with regression tests. See [SECURITY.md](./SECURITY.md) and [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
+| Governance | Proprietary [LICENSE](./LICENSE), CodeQL, Dependabot, CODEOWNERS, PR and issue templates |
 | Operations | Versioned releases ([CHANGELOG.md](./CHANGELOG.md)); `make` targets for install, lint, test, build, and image |
 | Contributing | Workflow and PR checklist in [CONTRIBUTING.md](./CONTRIBUTING.md) |
 
 ```bash
-make install   # editable install with dev tools
-make lint      # ruff
-make test      # pytest + legacy run_tests suite
-make audit     # pip-audit
-make docker    # build the hardened image
+make install       # editable install with dev tools
+make lint          # ruff
+make test          # unit tests + legacy run_tests suite (no Docker needed)
+make test-docker   # build the sandbox image and run live isolation tests
+make audit         # pip-audit
+make docker        # build the sandbox image
 ```
 
-> **Important:** `run_code` and `run_tests` provide timeouts and process separation, **not** a security boundary. Run any agent that executes model-written code inside a container or VM with restricted egress. See [SECURITY.md](./SECURITY.md).
+Code execution uses Docker when it is available. To require it:
+
+```bash
+export AI_TOOLS_ISOLATION=docker   # fail closed if Docker or the image is missing
+```
+
+> **Important:** without Docker, `run_code` and `run_tests` fall back to a scrubbed child process with timeouts and resource limits. That is **not** a security boundary, and every such result carries a `warning`. Production deployments should set `AI_TOOLS_ISOLATION=docker` and use a hardened container runtime. See [SECURITY.md](./SECURITY.md).
 
 ---
 

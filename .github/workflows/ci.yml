@@ -8,9 +8,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
+    name: Lint and test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -25,31 +31,61 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: Lint
         run: ruff check tools tests debug_agent
-      - name: Test
-        run: pytest
-      - name: Test legacy run_tests suite
+      - name: Format check
+        run: ruff format --check tools tests debug_agent
+      - name: Test (unit)
+        run: pytest -m "not docker"
+      - name: Test (legacy run_tests suite)
         run: pytest tools/run_tests/test_tool.py
 
-  dependency-audit:
+  docker-isolation:
+    name: Container isolation tests
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install -e ".[dev]"
-      - name: Audit installed dependencies for known vulnerabilities
-        run: pip-audit
-
-  build:
-    runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install build && python -m build
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: Build sandbox image
+        run: make docker
+      - name: Run isolation tests against Docker (fail closed)
+        env:
+          AI_TOOLS_ISOLATION: docker
+        run: pytest -m docker -v
+
+  dependency-audit:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: pip-audit --strict
+
+  build:
+    name: Build package and verify install
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - name: Verify wheel installs and imports in a clean venv
+        run: |
+          python -m venv /tmp/verify
+          /tmp/verify/bin/pip install dist/*.whl
+          cd /tmp && /tmp/verify/bin/python -c "import tools.run_code as r; assert 'ok' in r.run_code('print(\"ok\")', isolation='process')['stdout']"
       - uses: actions/upload-artifact@v4
         with:
           name: dist

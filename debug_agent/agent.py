@@ -17,13 +17,17 @@ Requires:
 import argparse
 import json
 import os
-import subprocess
 import sys
 import textwrap
+from pathlib import Path
 
 # Both SDKs imported; only the selected one is used at runtime.
 import anthropic
 from openai import OpenAI
+
+# Code execution goes through the shared isolation layer (Docker by default).
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from tools._common.isolation import IsolationError, run_isolated  # noqa: E402
 
 # ──────────────────────────────────────────────────────────────────────────────
 # SANDBOX — all file operations are scoped to this directory
@@ -39,6 +43,7 @@ os.makedirs(SANDBOX, exist_ok=True)
 # TOOL IMPLEMENTATIONS — five sandboxed Python functions
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _safe_path(path: str) -> str:
     """Resolve *path* inside SANDBOX; raise ValueError if it escapes."""
     full = os.path.realpath(os.path.join(SANDBOX, path))
@@ -48,22 +53,26 @@ def _safe_path(path: str) -> str:
 
 
 def run_code(code: str) -> dict:
-    """Execute a Python snippet inside the sandbox; capture stdout/stderr."""
+    """Execute a Python snippet in the sandbox via the isolation layer (Docker when available)."""
     try:
-        result = subprocess.run(
-            [sys.executable, "-c", code],
-            capture_output=True, text=True, timeout=10, cwd=SANDBOX,
-        )
+        result = run_isolated(["-I", "-"], workdir=Path(SANDBOX), timeout=10, stdin=code)
         return {
             "stdout": result.stdout,
             "stderr": result.stderr,
-            "exit_code": result.returncode,
-            "timed_out": False,
+            "exit_code": result.returncode if result.returncode is not None else -1,
+            "timed_out": result.timed_out,
+            "isolation": result.isolation,
+            "warning": result.warning,
         }
-    except subprocess.TimeoutExpired:
-        return {"stdout": "", "stderr": "Timed out.", "exit_code": -1, "timed_out": True}
-    except Exception as exc:
-        return {"stdout": "", "stderr": str(exc), "exit_code": -1, "timed_out": False}
+    except (IsolationError, ValueError, OSError) as exc:
+        return {
+            "stdout": "",
+            "stderr": str(exc),
+            "exit_code": -1,
+            "timed_out": False,
+            "isolation": None,
+            "warning": None,
+        }
 
 
 def read_file(path: str) -> dict:
@@ -101,10 +110,22 @@ def run_tests(test_file: str, timeout: int = 30) -> dict:
     """Run pytest on a test file inside the sandbox; return structured results."""
     try:
         full = _safe_path(test_file)
-        result = subprocess.run(
-            [sys.executable, "-m", "pytest", full, "-v", "--tb=short", "--no-header"],
-            capture_output=True, text=True, timeout=timeout, cwd=SANDBOX,
+        rel = os.path.relpath(full, SANDBOX).replace(os.sep, "/")
+        result = run_isolated(
+            ["-m", "pytest", rel, "-v", "--tb=short", "--no-header", "-p", "no:cacheprovider"],
+            workdir=Path(SANDBOX),
+            timeout=timeout,
         )
+        if result.timed_out:
+            return {
+                "passed": 0,
+                "failed": -1,
+                "failures": [],
+                "output": "Timed out.",
+                "timed_out": True,
+                "isolation": result.isolation,
+                "warning": result.warning,
+            }
         output = result.stdout + result.stderr
         passed = output.count(" PASSED")
         failed = output.count(" FAILED")
@@ -120,10 +141,10 @@ def run_tests(test_file: str, timeout: int = 30) -> dict:
             "failures": failures[:20],
             "output": output[-3000:],
             "timed_out": False,
+            "isolation": result.isolation,
+            "warning": result.warning,
         }
-    except subprocess.TimeoutExpired:
-        return {"passed": 0, "failed": -1, "failures": [], "output": "Timed out.", "timed_out": True}
-    except Exception as exc:
+    except (IsolationError, ValueError, OSError) as exc:
         return {"passed": 0, "failed": -1, "failures": [], "output": str(exc), "timed_out": False}
 
 
@@ -257,11 +278,11 @@ TOOLS_OPENAI = [
 # ──────────────────────────────────────────────────────────────────────────────
 
 _TOOL_MAP = {
-    "run_code":   run_code,
-    "read_file":  read_file,
+    "run_code": run_code,
+    "read_file": read_file,
     "write_file": write_file,
     "list_files": list_files,
-    "run_tests":  run_tests,
+    "run_tests": run_tests,
 }
 
 
@@ -283,9 +304,10 @@ def execute_tool(name: str, inputs: dict) -> str:
 # AGENT LOOP — Anthropic backend
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def run_agent_anthropic(user_instruction: str, model: str, max_iterations: int) -> str:
     """Agentic loop using the Anthropic SDK (Claude models)."""
-    client = anthropic.Anthropic()   # reads ANTHROPIC_API_KEY from env
+    client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
     history = [{"role": "user", "content": user_instruction}]
 
     for iteration in range(1, max_iterations + 1):
@@ -304,8 +326,12 @@ def run_agent_anthropic(user_instruction: str, model: str, max_iterations: int) 
                 if block.type != "tool_use":
                     continue
                 raw = execute_tool(block.name, block.input)
-                print(f"[iter {iteration:2d}] tool: {block.name:<12} | result: {textwrap.shorten(raw, 200, placeholder='…')}")
-                tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": raw})
+                print(
+                    f"[iter {iteration:2d}] tool: {block.name:<12} | result: {textwrap.shorten(raw, 200, placeholder='…')}"
+                )
+                tool_results.append(
+                    {"type": "tool_result", "tool_use_id": block.id, "content": raw}
+                )
             history.append({"role": "user", "content": tool_results})
 
         elif stop_reason == "end_turn":
@@ -333,11 +359,12 @@ def run_agent_anthropic(user_instruction: str, model: str, max_iterations: int) 
 #   • Results sent back as role="tool" messages, one per call
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def run_agent_ollama(user_instruction: str, model: str, max_iterations: int) -> str:
     """Agentic loop using Ollama's OpenAI-compatible endpoint."""
     client = OpenAI(
         base_url="http://localhost:11434/v1",
-        api_key="ollama",           # Ollama ignores this but the SDK requires it
+        api_key="ollama",  # Ollama ignores this but the SDK requires it
     )
     history = [{"role": "user", "content": user_instruction}]
 
@@ -362,12 +389,16 @@ def run_agent_ollama(user_instruction: str, model: str, max_iterations: int) -> 
                 except json.JSONDecodeError:
                     inputs = {}
                 raw = execute_tool(tc.function.name, inputs)
-                print(f"[iter {iteration:2d}] tool: {tc.function.name:<12} | result: {textwrap.shorten(raw, 200, placeholder='…')}")
-                history.append({
-                    "role":         "tool",
-                    "tool_call_id": tc.id,
-                    "content":      raw,
-                })
+                print(
+                    f"[iter {iteration:2d}] tool: {tc.function.name:<12} | result: {textwrap.shorten(raw, 200, placeholder='…')}"
+                )
+                history.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": raw,
+                    }
+                )
 
         elif finish_reason == "stop":
             final = message.content or "(No text)"
@@ -389,16 +420,21 @@ def run_agent_ollama(user_instruction: str, model: str, max_iterations: int) -> 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Autonomous code-debugging agent")
     parser.add_argument(
-        "--local", action="store_true",
+        "--local",
+        action="store_true",
         help="Use a local Ollama model instead of the Anthropic API",
     )
     parser.add_argument(
-        "--model", type=str, default=None,
+        "--model",
+        type=str,
+        default=None,
         help="Model name override. Defaults to 'claude-sonnet-4-6' (Anthropic) "
-             "or 'qwen2.5-coder:7b' (Ollama).",
+        "or 'qwen2.5-coder:7b' (Ollama).",
     )
     parser.add_argument(
-        "--max-iter", type=int, default=10,
+        "--max-iter",
+        type=int,
+        default=10,
         help="Maximum number of tool-call iterations (default: 10)",
     )
     args = parser.parse_args()

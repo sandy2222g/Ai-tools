@@ -1,8 +1,12 @@
+import os
 import subprocess
 import sys
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+# These unit tests mock subprocess, so force the process backend (no Docker probing).
+os.environ.setdefault("AI_TOOLS_ISOLATION", "process")
 
 # Ensure parent directory is in python path to allow importing tools
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -80,7 +84,9 @@ FAILED test_dummy.py::test_edge_case - assert 0 == 1
         self.assertEqual(result["failed"], 1)
         self.assertEqual(result["errors"], 0)
         self.assertEqual(result["summary"], "3 passed, 1 failed")
-        self.assertEqual(result["failures"], ["FAILED test_dummy.py::test_edge_case — assert 0 == 1"])
+        self.assertEqual(
+            result["failures"], ["FAILED test_dummy.py::test_edge_case — assert 0 == 1"]
+        )
         self.assertFalse(result["timed_out"])
         self.assertIsNone(result["error"])
 
