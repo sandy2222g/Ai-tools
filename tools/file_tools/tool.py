@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 # Default sandbox directory — all file operations are restricted to this folder.
@@ -10,8 +9,11 @@ def _safe_path(path: str, sandbox: Path = SANDBOX_DIR) -> Path:
     Resolve `path` against the sandbox and verify it doesn't escape.
     Returns the resolved Path, or raises ValueError if it's outside the sandbox.
     """
+    sandbox = sandbox.resolve()
     resolved = (sandbox / path).resolve()
-    if not str(resolved).startswith(str(sandbox)):
+    # Component-wise check: a plain string prefix would wrongly accept
+    # sibling directories such as "/data/sandbox_evil" for sandbox "/data/sandbox".
+    if not resolved.is_relative_to(sandbox):
         raise ValueError(f"Path traversal blocked: '{path}' resolves outside the sandbox.")
     return resolved
 

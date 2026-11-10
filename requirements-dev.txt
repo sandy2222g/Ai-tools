@@ -1,0 +1,2 @@
+# Development and CI dependencies. Runtime tools are dependency-free (stdlib only).
+-e .[dev]

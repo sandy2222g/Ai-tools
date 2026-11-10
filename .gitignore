@@ -22,3 +22,16 @@ Thumbs.db
 
 # Test Cache
 .pytest_cache/
+
+# Runtime sandboxes created by the tools
+research_sandbox/
+organizer_sandbox/
+sandbox/*
+!sandbox/solution.py
+!sandbox/test_solution.py
+
+# Build and tooling artifacts
+build/
+dist/
+*.egg-info/
+.ruff_cache/

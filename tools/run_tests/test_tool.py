@@ -1,12 +1,12 @@
-import unittest
-from unittest.mock import patch, MagicMock
 import subprocess
-from pathlib import Path
 import sys
+import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 # Ensure parent directory is in python path to allow importing tools
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from tools.run_tests.tool import run_tests, SANDBOX_DIR
+from tools.run_tests.tool import SANDBOX_DIR, run_tests
 
 
 class TestRunTests(unittest.TestCase):

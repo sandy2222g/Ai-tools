@@ -1,7 +1,7 @@
-import re
-import sys
-import subprocess
 import json
+import re
+import subprocess
+import sys
 from pathlib import Path
 
 SANDBOX_DIR = Path("./sandbox").resolve()
@@ -22,7 +22,7 @@ def run_tests(test_file: str, timeout: int = 10) -> dict:
     sandbox = SANDBOX_DIR
     try:
         resolved = (sandbox / test_file).resolve()
-        if not str(resolved).startswith(str(sandbox)):
+        if not resolved.is_relative_to(sandbox.resolve()):
             res["error"] = f"Path traversal blocked: '{test_file}' resolves outside the sandbox."
         elif not resolved.exists():
             res["error"] = f"File not found: '{test_file}'"
@@ -52,7 +52,7 @@ def run_tests(test_file: str, timeout: int = 10) -> dict:
         if line.startswith(("FAILED ", "ERROR ")):
             res["failures"].append(" — ".join(line.split(" - ", 1)) if " - " in line else line)
 
-    sum_line = next((l for l in reversed(output.splitlines()) if " in " in l and any(k in l for k in ["passed", "failed", "error", "no tests ran"])), "")
+    sum_line = next((ln for ln in reversed(output.splitlines()) if " in " in ln and any(k in ln for k in ["passed", "failed", "error", "no tests ran"])), "")
     if sum_line:
         m_p, m_f, m_e = re.search(r"(\d+)\s+passed", sum_line), re.search(r"(\d+)\s+failed", sum_line), re.search(r"(\d+)\s+error", sum_line)
         res["passed"] = int(m_p.group(1)) if m_p else 0
@@ -60,9 +60,12 @@ def run_tests(test_file: str, timeout: int = 10) -> dict:
         res["errors"] = int(m_e.group(1)) if m_e else 0
 
     parts = []
-    if res["passed"]: parts.append(f"{res['passed']} passed")
-    if res["failed"]: parts.append(f"{res['failed']} failed")
-    if res["errors"]: parts.append(f"{res['errors']} error{'s' if res['errors'] > 1 else ''}")
+    if res["passed"]:
+        parts.append(f"{res['passed']} passed")
+    if res["failed"]:
+        parts.append(f"{res['failed']} failed")
+    if res["errors"]:
+        parts.append(f"{res['errors']} error{'s' if res['errors'] > 1 else ''}")
     res["summary"] = ", ".join(parts) if parts else "0 passed"
     return res
 

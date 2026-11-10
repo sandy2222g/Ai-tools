@@ -25,7 +25,6 @@ import textwrap
 import anthropic
 from openai import OpenAI
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # SANDBOX — all file operations are scoped to this directory
 # ──────────────────────────────────────────────────────────────────────────────
@@ -43,7 +42,7 @@ os.makedirs(SANDBOX, exist_ok=True)
 def _safe_path(path: str) -> str:
     """Resolve *path* inside SANDBOX; raise ValueError if it escapes."""
     full = os.path.realpath(os.path.join(SANDBOX, path))
-    if not full.startswith(os.path.realpath(SANDBOX)):
+    if os.path.commonpath([full, os.path.realpath(SANDBOX)]) != os.path.realpath(SANDBOX):
         raise ValueError(f"Path '{path}' escapes the sandbox.")
     return full
 

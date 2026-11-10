@@ -16,6 +16,29 @@ Each tool lives in its own folder under `tools/`, is self-contained, and ships w
 
 ---
 
+## Enterprise Readiness
+
+| Area | What's in place |
+|------|-----------------|
+| Install | `pip install -e ".[dev]"` (`pyproject.toml`); `Dockerfile` runs as a non-root user |
+| Quality | `ruff` lint and a `pytest` suite (20 tests), enforced in CI on Python 3.10–3.13 |
+| Supply chain | `pip-audit` runs in CI; core tools are stdlib-only, so the dependency surface is minimal |
+| Security | Sandbox path checks use component-wise comparison with regression tests; see [SECURITY.md](./SECURITY.md) |
+| Operations | Versioned releases ([CHANGELOG.md](./CHANGELOG.md)); `make` targets for install, lint, test, build, and image |
+| Contributing | Workflow and PR checklist in [CONTRIBUTING.md](./CONTRIBUTING.md) |
+
+```bash
+make install   # editable install with dev tools
+make lint      # ruff
+make test      # pytest + legacy run_tests suite
+make audit     # pip-audit
+make docker    # build the hardened image
+```
+
+> **Important:** `run_code` and `run_tests` provide timeouts and process separation, **not** a security boundary. Run any agent that executes model-written code inside a container or VM with restricted egress. See [SECURITY.md](./SECURITY.md).
+
+---
+
 ## Project Structure
 
 ```
